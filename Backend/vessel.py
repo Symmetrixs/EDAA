@@ -8,9 +8,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Initialize Supabase
+# Initialize Supabase Client with proper error handling
 url = os.environ.get("SUPABASE_URL")
-key = os.environ.get("SUPABASE_KEY")
+key = os.environ.get("SUPABASE_ANON_KEY")  # Changed from SUPABASE_KEY
+
+# Validate environment variables before creating client
+if not url:
+    raise ValueError("SUPABASE_URL environment variable is not set.")
+if not key:
+    raise ValueError("SUPABASE_ANON_KEY environment variable is not set.")
+
 supabase: Client = create_client(url, key)
 
 router = APIRouter(prefix="/vessel", tags=["Vessel / Equipment"])
