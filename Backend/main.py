@@ -20,12 +20,13 @@ from notification import router as notification_router
 # 1. Load Environment Variables
 load_dotenv()
 url = os.environ.get("SUPABASE_URL")
-key = os.environ.get("SUPABASE_KEY")
+key = os.environ.get("SUPABASE_ANON_KEY")
 
-if not url or not key:
-    raise ValueError("❌ Supabase credentials not found in .env file")
+if not url:
+    raise ValueError("SUPABASE_URL environment variable is not set.")
+if not key:
+    raise ValueError("SUPABASE_ANON_KEY environment variable is not set.")
 
-# 2. Initialize Supabase Client
 supabase: Client = create_client(url, key)
 
 # 3. Initialize FastAPI

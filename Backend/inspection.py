@@ -10,7 +10,13 @@ load_dotenv()
 
 # Initialize Supabase
 url = os.environ.get("SUPABASE_URL")
-key = os.environ.get("SUPABASE_KEY")
+key = os.environ.get("SUPABASE_ANON_KEY")
+
+if not url:
+    raise ValueError("SUPABASE_URL environment variable is not set.")
+if not key:
+    raise ValueError("SUPABASE_ANON_KEY environment variable is not set.")
+
 supabase: Client = create_client(url, key)
 
 router = APIRouter(prefix="/inspection", tags=["Inspection"])
