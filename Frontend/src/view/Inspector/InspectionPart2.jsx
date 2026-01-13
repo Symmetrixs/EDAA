@@ -23,18 +23,18 @@ export default function InspectionPart2({ inspectionId }) {
 
     useEffect(() => {
         const checkHealth = async () => {
-            try {
-                const res = await api.get("/ai-detection/health");
-                setModelInfo({
-                    available: res.data.model_loaded,
-                    checking: false
-                });
-            } catch (err) {
-                console.error("AI Health Check Failed", err);
-                setModelInfo({ available: false, checking: false });
-            }
-        };
-        checkHealth();
+    try {
+        const res = await api.get("/ai-detection/health");
+        console.log("AI Health Response:", res.data); // Debug
+        setModelInfo({
+            available: res.data.status === "healthy" && res.data.connection === "ok",  // ✅ Fixed!
+            checking: false
+        });
+    } catch (err) {
+        console.error("AI Health Check Failed", err);
+        setModelInfo({ available: false, checking: false });
+    }
+};
     }, []);
 
     const {
