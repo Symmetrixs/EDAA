@@ -25,7 +25,7 @@ router = APIRouter(prefix="/ai-detection", tags=["AI Detection"])
 # After deploying, update this with your actual Space URL
 HF_SPACE_URL = os.environ.get(
     "HF_SPACE_URL",
-    "https://YOUR-USERNAME-rtdetr-defect-detection.hf.space"
+    "https://symmetrixs-edaa.hf.space"
 )
 
 # Timeout for API requests (seconds)
