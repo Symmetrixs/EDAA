@@ -7,18 +7,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Initialize Supabase Client
 url = os.environ.get("SUPABASE_URL")
-key = os.environ.get("SUPABASE_KEY")
+key = os.environ.get("SUPABASE_ANON_KEY") 
 
-# Validate environment variables before creating client
+
 if not url:
-    raise ValueError("SUPABASE_URL environment variable is not set. Please configure it in your Render dashboard.")
+    raise ValueError("SUPABASE_URL environment variable is not set.")
 if not key:
-    raise ValueError("SUPABASE_KEY environment variable is not set. Please configure it in your Render dashboard.")
+    raise ValueError("SUPABASE_ANON_KEY environment variable is not set.")
 
 supabase: Client = create_client(url, key)
-
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
