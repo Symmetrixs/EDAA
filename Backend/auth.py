@@ -10,9 +10,17 @@ load_dotenv()
 # Initialize Supabase Client
 url = os.environ.get("SUPABASE_URL")
 key = os.environ.get("SUPABASE_KEY")
+
+# Validate environment variables before creating client
+if not url:
+    raise ValueError("SUPABASE_URL environment variable is not set. Please configure it in your Render dashboard.")
+if not key:
+    raise ValueError("SUPABASE_KEY environment variable is not set. Please configure it in your Render dashboard.")
+
 supabase: Client = create_client(url, key)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
 
 # -----------------------
 # Pydantic Models
