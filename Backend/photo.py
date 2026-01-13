@@ -8,6 +8,8 @@ import traceback
 import base64
 from datetime import datetime
 import time
+import httpx
+import asyncio
 
 load_dotenv()
 
@@ -23,6 +25,12 @@ if not key:
 supabase: Client = create_client(url, key)
 
 router = APIRouter(prefix="/photo", tags=["Photo Reporting"])
+
+# HuggingFace Space Configuration
+HF_SPACE_URL = os.environ.get(
+    "HF_SPACE_URL",
+    "https://symmetrixs-edaa.hf.space"
+)
 
 # ---------------------------------------------------------
 # Pydantic Models
@@ -54,7 +62,7 @@ class CanvasSaveRequest(BaseModel):
     canvas_image_base64: str
 
 # ---------------------------------------------------------
-# Helper Function
+# Helper Functions
 # ---------------------------------------------------------
 
 async def upload_annotated_image_to_storage(annotated_image_base64, inspection_id, photo_id):
@@ -88,8 +96,31 @@ async def upload_annotated_image_to_storage(annotated_image_base64, inspection_i
         traceback.print_exc()
         return None
 
+async def call_hf_with_retry(client, url, data, max_retries=3):
+    """
+    Retry logic for HuggingFace Space wake-up
+    Spaces may be sleeping and need time to start
+    """
+    for attempt in range(max_retries):
+        try:
+            print(f"🔄 Calling HF Space (attempt {attempt+1}/{max_retries}): {url}")
+            response = await client.post(url, json=data, timeout=120.0)
+            response.raise_for_status()
+            print(f"✅ HF Space responded successfully")
+            return response
+        except (httpx.TimeoutException, httpx.ConnectError, httpx.HTTPStatusError) as e:
+            if attempt < max_retries - 1:
+                wait_time = 10 * (2 ** attempt)  # 10s, 20s, 40s
+                print(f"⏳ Attempt {attempt+1} failed: {e}")
+                print(f"⏳ Space might be waking up, waiting {wait_time}s before retry...")
+                await asyncio.sleep(wait_time)
+            else:
+                print(f"❌ All {max_retries} attempts failed")
+                raise
+    raise Exception("Max retries exceeded")
+
 # ---------------------------------------------------------
-# Routes
+# Basic Photo CRUD Routes
 # ---------------------------------------------------------
 
 @router.post("/", status_code=201)
@@ -193,14 +224,17 @@ def upload_photo(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Failed to upload: {str(e)}")
 
 # ---------------------------------------------------------
-# AI Detection Endpoints with Storage
+# AI Detection Endpoints with HuggingFace Space Integration
 # ---------------------------------------------------------
 
 @router.post("/batch-detect/{inspection_id}")
 async def batch_detect_and_save(inspection_id: int, category: str):
-    """AI detection with storage upload"""
+    """
+    AI detection with HuggingFace Space integration
+    Handles Space wake-up and retry logic
+    """
     try:
-        # Get photos
+        # Get photos from database
         photos_response = supabase.table("PhotoReport")\
             .select("PhotoID, PhotoURL, Caption, PhotoNumbering")\
             .eq("InspectionID", inspection_id)\
@@ -211,85 +245,146 @@ async def batch_detect_and_save(inspection_id: int, category: str):
         if not photos_response.data:
             return {"success": True, "processed": 0, "results": []}
         
-        # Use ALL photos (both main and grouped)
         all_photos = photos_response.data
-        
         photo_ids = [p["PhotoID"] for p in all_photos]
         photo_urls = [p["PhotoURL"] for p in all_photos]
         
-        print(f"📸 Detecting {len(all_photos)} photos")
+        print(f"📸 Detecting {len(all_photos)} photos in category '{category}'")
+        print(f"🌐 Using HuggingFace Space: {HF_SPACE_URL}")
         
-        # Call AI detection
-        import httpx
+        # Call HuggingFace Space for AI detection
         async with httpx.AsyncClient(timeout=300.0) as client:
-            ai_response = await client.post(
-                "http://localhost:8000/ai-detection/detect-batch",
-                json={"photo_ids": photo_ids, "photo_urls": photo_urls, "category": category}
-            )
-            ai_results = ai_response.json()
+            ai_results = None
+            
+            try:
+                # Try batch detection first
+                print("🚀 Attempting batch detection...")
+                ai_response = await call_hf_with_retry(
+                    client,
+                    f"{HF_SPACE_URL}/detect-batch",
+                    {
+                        "photo_ids": photo_ids,
+                        "photo_urls": photo_urls,
+                        "category": category
+                    },
+                    max_retries=3
+                )
+                ai_results = ai_response.json()
+                print(f"✅ Batch detection successful")
+                
+            except Exception as batch_err:
+                print(f"⚠️ Batch detection failed: {batch_err}")
+                print(f"🔄 Falling back to one-by-one detection...")
+                
+                # Fallback: detect photos one by one
+                ai_results = {"success": True, "results": []}
+                
+                for idx, (photo_id, photo_url) in enumerate(zip(photo_ids, photo_urls)):
+                    try:
+                        print(f"  📷 Detecting photo {idx+1}/{len(photo_ids)} (ID: {photo_id})...")
+                        
+                        single_response = await call_hf_with_retry(
+                            client,
+                            f"{HF_SPACE_URL}/detect-by-url",
+                            {"photo_url": photo_url},
+                            max_retries=2
+                        )
+                        
+                        result = single_response.json()
+                        result["photo_id"] = photo_id
+                        ai_results["results"].append(result)
+                        print(f"  ✅ Photo {photo_id} detected: {result.get('detection_count', 0)} defects")
+                        
+                        # Add small delay to avoid rate limiting
+                        if idx < len(photo_ids) - 1:
+                            await asyncio.sleep(2)
+                        
+                    except Exception as e:
+                        print(f"  ❌ Failed to detect photo {photo_id}: {e}")
+                        ai_results["results"].append({
+                            "photo_id": photo_id,
+                            "success": False,
+                            "detections": [],
+                            "finding": "Detection failed. Please review manually.",
+                            "recommendation": "Manual inspection required.",
+                            "detection_count": 0,
+                            "annotated_image_base64": None
+                        })
         
-        if not ai_results.get("success"):
+        if not ai_results or not ai_results.get("success"):
             raise HTTPException(status_code=500, detail="AI detection failed")
         
-        # Process results
+        # Process AI results and update database
+        print(f"💾 Processing {len(ai_results['results'])} detection results...")
         processed_results = []
         
         for result in ai_results["results"]:
             photo_id = result["photo_id"]
             
-            # Create Finding
-            finding_response = supabase.table("Finding").insert({
-                "Description": result["finding"]
-            }).execute()
-            
-            if not finding_response.data:
-                continue
-            
-            finding_id = finding_response.data[0]["FindingID"]
-            
-            # Create Recommendation
-            recommendation_response = supabase.table("Recommendation").insert({
-                "Description": result["recommendation"]
-            }).execute()
-            
-            if not recommendation_response.data:
-                continue
-            
-            recommendation_id = recommendation_response.data[0]["RecommendID"]
-            
-            # Upload annotated image to storage
-            annotated_url = await upload_annotated_image_to_storage(
-                result.get("annotated_image_base64"),
-                inspection_id,
-                photo_id
-            )
-            
-            # Update PhotoReport
-            update_data = {
-                "FindingID": finding_id,
-                "RecommendID": recommendation_id,
-            }
-            
-            if annotated_url:
-                update_data["AnnotatedPhotoURL"] = annotated_url
-                update_data["AIDetectionDate"] = datetime.now().isoformat()
+            try:
+                # Create Finding record
+                finding_response = supabase.table("Finding").insert({
+                    "Description": result.get("finding", "No finding description")
+                }).execute()
                 
-                # Get max confidence
-                if result.get("detections"):
-                    max_conf = max([d["confidence"] for d in result["detections"]])
-                    update_data["DetectionConfidence"] = max_conf
-            
-            supabase.table("PhotoReport")\
-                .update(update_data)\
-                .eq("PhotoID", photo_id)\
-                .execute()
-            
-            processed_results.append({
-                **result,
-                "annotated_photo_url": annotated_url
-            })
+                if not finding_response.data:
+                    print(f"⚠️ Failed to create finding for photo {photo_id}")
+                    continue
+                
+                finding_id = finding_response.data[0]["FindingID"]
+                
+                # Create Recommendation record
+                recommendation_response = supabase.table("Recommendation").insert({
+                    "Description": result.get("recommendation", "No recommendation")
+                }).execute()
+                
+                if not recommendation_response.data:
+                    print(f"⚠️ Failed to create recommendation for photo {photo_id}")
+                    continue
+                
+                recommendation_id = recommendation_response.data[0]["RecommendID"]
+                
+                # Upload annotated image to storage (if available)
+                annotated_url = None
+                if result.get("annotated_image_base64"):
+                    annotated_url = await upload_annotated_image_to_storage(
+                        result["annotated_image_base64"],
+                        inspection_id,
+                        photo_id
+                    )
+                
+                # Update PhotoReport with AI results
+                update_data = {
+                    "FindingID": finding_id,
+                    "RecommendID": recommendation_id,
+                }
+                
+                if annotated_url:
+                    update_data["AnnotatedPhotoURL"] = annotated_url
+                    update_data["AIDetectionDate"] = datetime.now().isoformat()
+                    
+                    # Store confidence score if available
+                    if result.get("detections"):
+                        max_conf = max([d["confidence"] for d in result["detections"]])
+                        update_data["DetectionConfidence"] = max_conf
+                
+                supabase.table("PhotoReport")\
+                    .update(update_data)\
+                    .eq("PhotoID", photo_id)\
+                    .execute()
+                
+                processed_results.append({
+                    **result,
+                    "annotated_photo_url": annotated_url
+                })
+                
+                print(f"  ✅ Updated photo {photo_id} in database")
+                
+            except Exception as e:
+                print(f"  ❌ Error processing photo {photo_id}: {e}")
+                traceback.print_exc()
         
-        print(f"✅ Complete: {len(processed_results)} photos")
+        print(f"🎉 Batch detection complete: {len(processed_results)}/{len(all_photos)} photos processed")
         
         return {
             "success": True,
@@ -297,17 +392,21 @@ async def batch_detect_and_save(inspection_id: int, category: str):
             "results": processed_results
         }
     
+    except HTTPException as he:
+        raise he
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ Batch detection error: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/redetect/{photo_id}")
 async def redetect_single_photo(photo_id: int):
-    """Re-detect single photo with storage"""
+    """
+    Re-detect a single photo using HuggingFace Space
+    """
     try:
-        # Get photo
+        # Get photo from database
         photo_response = supabase.table("PhotoReport")\
             .select("*")\
             .eq("PhotoID", photo_id)\
@@ -318,14 +417,20 @@ async def redetect_single_photo(photo_id: int):
         
         photo = photo_response.data[0]
         
-        # Call AI detection
-        import httpx
+        print(f"🔄 Re-detecting photo {photo_id}")
+        print(f"🌐 Using HuggingFace Space: {HF_SPACE_URL}")
+        
+        # Call HuggingFace Space
         async with httpx.AsyncClient(timeout=60.0) as client:
-            ai_response = await client.post(
-                "http://localhost:8000/ai-detection/detect-by-url",
-                params={"photo_url": photo["PhotoURL"]}
+            ai_response = await call_hf_with_retry(
+                client,
+                f"{HF_SPACE_URL}/detect-by-url",
+                {"photo_url": photo["PhotoURL"]},
+                max_retries=3
             )
             ai_result = ai_response.json()
+        
+        print(f"✅ Detection complete: {ai_result.get('detection_count', 0)} defects found")
         
         # Update or create Finding
         if photo.get("FindingID"):
@@ -334,11 +439,13 @@ async def redetect_single_photo(photo_id: int):
                 .eq("FindingID", photo["FindingID"])\
                 .execute()
             finding_id = photo["FindingID"]
+            print(f"  ✅ Updated existing Finding {finding_id}")
         else:
             finding_response = supabase.table("Finding").insert({
                 "Description": ai_result["finding"]
             }).execute()
             finding_id = finding_response.data[0]["FindingID"]
+            print(f"  ✅ Created new Finding {finding_id}")
         
         # Update or create Recommendation
         if photo.get("RecommendID"):
@@ -347,18 +454,22 @@ async def redetect_single_photo(photo_id: int):
                 .eq("RecommendID", photo["RecommendID"])\
                 .execute()
             recommendation_id = photo["RecommendID"]
+            print(f"  ✅ Updated existing Recommendation {recommendation_id}")
         else:
             recommendation_response = supabase.table("Recommendation").insert({
                 "Description": ai_result["recommendation"]
             }).execute()
             recommendation_id = recommendation_response.data[0]["RecommendID"]
+            print(f"  ✅ Created new Recommendation {recommendation_id}")
         
         # Upload annotated image
-        annotated_url = await upload_annotated_image_to_storage(
-            ai_result.get("annotated_image_base64"),
-            photo["InspectionID"],
-            photo_id
-        )
+        annotated_url = None
+        if ai_result.get("annotated_image_base64"):
+            annotated_url = await upload_annotated_image_to_storage(
+                ai_result["annotated_image_base64"],
+                photo["InspectionID"],
+                photo_id
+            )
         
         # Update PhotoReport
         update_data = {
@@ -378,6 +489,8 @@ async def redetect_single_photo(photo_id: int):
             .eq("PhotoID", photo_id)\
             .execute()
         
+        print(f"✅ Photo {photo_id} updated in database")
+        
         return {
             "success": True,
             "photo_id": photo_id,
@@ -388,14 +501,16 @@ async def redetect_single_photo(photo_id: int):
             "detection_count": ai_result.get("detection_count", 0)
         }
     
+    except HTTPException as he:
+        raise he
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ Re-detection error: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 # ======================================================================
-# Canvas Save Endpoint
+# Canvas Annotation Endpoints
 # ======================================================================
 
 @router.post("/save-canvas-annotation")
@@ -461,7 +576,7 @@ async def save_canvas_annotation(request: CanvasSaveRequest):
 
 
 # ======================================================================
-# Remove AI Endpoint
+# Remove AI/Canvas Endpoints
 # ======================================================================
 
 @router.delete("/remove-ai/{photo_id}")
@@ -536,10 +651,6 @@ async def remove_ai_findings(photo_id: int):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-
-# ======================================================================
-# Remove Canvas Endpoint
-# ======================================================================
 
 @router.delete("/remove-canvas/{photo_id}")
 async def remove_canvas(photo_id: int):
