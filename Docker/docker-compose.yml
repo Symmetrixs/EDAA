@@ -1,0 +1,55 @@
+services:
+  backend:
+    build:
+      context: ../Backend
+      dockerfile: ../Docker/Dockerfile.backend
+    container_name: edaa-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - VITE_API_URL=${VITE_API_URL}
+      - API_HOST=${API_HOST}
+      - API_PORT=${API_PORT}
+      - RTDETR_MODEL_PATH=${RTDETR_MODEL_PATH}
+    env_file:
+      - .env
+    volumes:
+      - ../Backend:/app
+      - ../Frontend/public:/app/public
+      - /app/__pycache__
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000').read()" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ../Frontend
+      dockerfile: ../Docker/Dockerfile.frontend
+    container_name: edaa-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_SUPABASE_URL=${SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+    volumes:
+      - ../Frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

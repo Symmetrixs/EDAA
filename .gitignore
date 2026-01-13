@@ -1,0 +1,25 @@
+﻿# Environment
+.env
+*.env
+_env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# AI Model (on HF Space, don't push)
+best.pt
+AI_model/*.pt
+
+# Node
+node_modules/
+dist/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

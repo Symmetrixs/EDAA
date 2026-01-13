@@ -1,0 +1,42 @@
+{
+  "name": "workshop-2-automated-inspection-report",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "source": "./index.html",
+  "homepage": "https://jiayingloh.github.io/Workshop-2-Automated-Inspection-Report",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "deploy": "npm run build && gh-pages -d dist"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.0.8",
+    "@dnd-kit/sortable": "^7.0.2",
+    "@dnd-kit/utilities": "^3.2.1",
+    "@supabase/supabase-js": "^2.87.1",
+    "axios": "^1.13.2",
+    "@slosarek/docxtemplater-image-module-free": "^1.0.3",
+    "docxtemplater": "^3.67.6",
+    "jspdf": "^3.0.4",
+    "pizzip": "^3.2.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-icons": "^5.0.1",
+    "react-router-dom": "^6.8.1",
+    "recharts": "^3.5.1",
+    "tailwindcss-animate": "1.0.7"
+  },
+  "devDependencies": {
+    "@animaapp/vite-plugin-screen-graph": "^0.1.5",
+    "@vitejs/plugin-react": "4.3.4",
+    "autoprefixer": "^10.4.22",
+    "esbuild": "0.24.0",
+    "globals": "15.12.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.18",
+    "vite": "6.0.4"
+  }
+}

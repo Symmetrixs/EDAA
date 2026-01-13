@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+supabase
+python-dotenv
+python-multipart
+pydantic
+reportlab
+requests
+docx2pdf
+docxtpl
+pillow
+httpx
+python-docx==0.8.11
+
+# NOTE: torch, torchvision, ultralytics, opencv-python are NO LONGER NEEDED
+# AI inference is now handled by Hugging Face Space
+# This saves 2-4GB of RAM and allows deployment on free tier (512MB)

@@ -1,0 +1,312 @@
+{
+  "nodes": [
+    {
+      "id": "src/view/Auth/Login.jsx",
+      "label": "Login",
+      "routes": [
+        "/"
+      ],
+      "isRoot": true
+    },
+    {
+      "id": "src/view/Auth/Register.jsx",
+      "label": "Register",
+      "routes": [
+        "/register"
+      ]
+    },
+    {
+      "id": "src/view/Auth/ForgotPassword.jsx",
+      "label": "ForgotPassword",
+      "routes": [
+        "/forgot-password"
+      ]
+    },
+    {
+      "id": "src/view/Auth/ResetPassword.jsx",
+      "label": "ResetPassword",
+      "routes": [
+        "/reset-password"
+      ]
+    },
+    {
+      "id": "src/view/Inspector/InspectorLayout.jsx",
+      "label": "InspectorLayout",
+      "routes": [
+        "/dashboard"
+      ]
+    },
+    {
+      "id": "src/view/Inspector/InspectionPart1.jsx",
+      "label": "InspectionPart1",
+      "routes": [
+        "inspection-part1"
+      ]
+    },
+    {
+      "id": "src/view/Inspector/Profile.jsx",
+      "label": "Profile",
+      "routes": [
+        "profile"
+      ]
+    },
+    {
+      "id": "src/view/Admin/Settings.jsx",
+      "label": "Settings",
+      "routes": [
+        "settings"
+      ]
+    },
+    {
+      "id": "src/view/Inspector/ReportManagement.jsx",
+      "label": "ReportManagement",
+      "routes": [
+        "reportmanagement"
+      ]
+    },
+    {
+      "id": "src/view/Inspector/TeamSharedReport.jsx",
+      "label": "TeamSharedReport",
+      "routes": [
+        "teamsharedreport"
+      ]
+    },
+    {
+      "id": "src/view/Inspector/VesselManagement.jsx",
+      "label": "VesselManagement",
+      "routes": [
+        "vesselmanagement"
+      ]
+    },
+    {
+      "id": "src/view/Inspector/AddEquipment.jsx",
+      "label": "AddEquipment",
+      "routes": [
+        "vesselmanagement/add"
+      ]
+    },
+    {
+      "id": "src/view/Inspector/EditEquipment.jsx",
+      "label": "EditEquipment",
+      "routes": [
+        "vesselmanagement/edit"
+      ]
+    },
+    {
+      "id": "src/view/Inspector/InspectionManagement.jsx",
+      "label": "InspectionManagement",
+      "routes": [
+        "inspection"
+      ]
+    },
+    {
+      "id": "src/view/Inspector/InspectionPart2.jsx",
+      "label": "InspectionPart2",
+      "routes": [
+        "inspection-part2/:inspectionId"
+      ]
+    },
+    {
+      "id": "src/view/Inspector/InspectionPart3.jsx",
+      "label": "InspectionPart3",
+      "routes": [
+        "inspection-part3/:inspectionId"
+      ]
+    },
+    {
+      "id": "src/view/Inspector/StatisticAnalysis.jsx",
+      "label": "StatisticAnalysis",
+      "routes": [
+        "statistics"
+      ]
+    },
+    {
+      "id": "src/view/Admin/AdminLayout.jsx",
+      "label": "AdminLayout",
+      "routes": [
+        "/admin"
+      ]
+    },
+    {
+      "id": "src/view/Admin/Users.jsx",
+      "label": "Users",
+      "routes": [
+        "users"
+      ]
+    },
+    {
+      "id": "src/view/Admin/Reports.jsx",
+      "label": "Reports",
+      "routes": [
+        "reports"
+      ]
+    },
+    {
+      "id": "src/view/Admin/Vessels.jsx",
+      "label": "Vessels",
+      "routes": [
+        "vessels"
+      ]
+    },
+    {
+      "id": "src/view/Admin/Analytics.jsx",
+      "label": "Analytics",
+      "routes": [
+        "analytics"
+      ]
+    },
+    {
+      "id": "src/view/Admin/Notifications.jsx",
+      "label": "Notifications",
+      "routes": [
+        "notifications"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "src/view/Auth/Login.jsx:140:12-to-src/view/Auth/ForgotPassword.jsx",
+      "source": "src/view/Auth/Login.jsx",
+      "target": "src/view/Auth/ForgotPassword.jsx",
+      "data": {
+        "viaRoute": "/forgot-password",
+        "trigger": {
+          "element": "<Link to=\"/forgot-password\" className=\"text-sm text-blue-400 hover:text-blue-300 hover:underline\">\r\n              Forgot Password?\r\n            </Link>",
+          "line": 140,
+          "endLine": 142,
+          "column": 12,
+          "endColumn": 19,
+          "sourceFile": "src/view/Auth/Login.jsx"
+        }
+      }
+    },
+    {
+      "id": "src/view/Auth/Login.jsx:157:10-to-src/view/Auth/Register.jsx",
+      "source": "src/view/Auth/Login.jsx",
+      "target": "src/view/Auth/Register.jsx",
+      "data": {
+        "viaRoute": "/register",
+        "trigger": {
+          "element": "<Link\r\n            to=\"/register\"\r\n            className=\"text-blue-400 font-medium hover:text-blue-300 hover:underline transition duration-150 ease-in-out\"\r\n          >\r\n            Register\r\n          </Link>",
+          "line": 157,
+          "endLine": 162,
+          "column": 10,
+          "endColumn": 17,
+          "sourceFile": "src/view/Auth/Login.jsx"
+        }
+      }
+    },
+    {
+      "id": "src/view/Auth/Register.jsx:170:10-to-src/view/Auth/Login.jsx",
+      "source": "src/view/Auth/Register.jsx",
+      "target": "src/view/Auth/Login.jsx",
+      "data": {
+        "viaRoute": "/",
+        "trigger": {
+          "element": "<Link\r\n            to=\"/\"\r\n            className=\"text-blue-400 font-medium hover:text-blue-300 hover:underline transition duration-150 ease-in-out\"\r\n          >\r\n            Login\r\n          </Link>",
+          "line": 170,
+          "endLine": 175,
+          "column": 10,
+          "endColumn": 17,
+          "sourceFile": "src/view/Auth/Register.jsx"
+        }
+      }
+    },
+    {
+      "id": "src/view/Auth/ForgotPassword.jsx:65:20-to-src/view/Auth/Login.jsx",
+      "source": "src/view/Auth/ForgotPassword.jsx",
+      "target": "src/view/Auth/Login.jsx",
+      "data": {
+        "viaRoute": "/",
+        "trigger": {
+          "element": "<Link to=\"/\" className=\"text-blue-400 hover:underline\">Back to Login</Link>",
+          "line": 65,
+          "endLine": 65,
+          "column": 20,
+          "endColumn": 95,
+          "sourceFile": "src/view/Auth/ForgotPassword.jsx"
+        }
+      }
+    },
+    {
+      "id": "src/view/Auth/ResetPassword.jsx:48:16-to-src/view/Auth/Login.jsx",
+      "source": "src/view/Auth/ResetPassword.jsx",
+      "target": "src/view/Auth/Login.jsx",
+      "data": {
+        "viaRoute": "/",
+        "trigger": {
+          "element": "navigate(\"/\")",
+          "line": 48,
+          "endLine": 48,
+          "column": 16,
+          "endColumn": 29,
+          "sourceFile": "src/view/Auth/ResetPassword.jsx"
+        }
+      }
+    },
+    {
+      "id": "src/view/Inspector/Menu.jsx:64:4-to-src/view/Auth/Login.jsx",
+      "source": "src/view/Inspector/InspectorLayout.jsx",
+      "target": "src/view/Auth/Login.jsx",
+      "data": {
+        "viaRoute": "/",
+        "trigger": {
+          "element": "navigate(\"/\")",
+          "line": 64,
+          "endLine": 64,
+          "column": 4,
+          "endColumn": 17,
+          "sourceFile": "src/view/Inspector/Menu.jsx"
+        }
+      }
+    },
+    {
+      "id": "src/view/Inspector/InspectionPart3.jsx:208:43-to-src/view/Inspector/InspectorLayout.jsx",
+      "source": "src/view/Inspector/InspectionManagement.jsx",
+      "target": "src/view/Inspector/InspectorLayout.jsx",
+      "data": {
+        "viaRoute": "/dashboard",
+        "trigger": {
+          "element": "navigate(\"/dashboard\")",
+          "line": 208,
+          "endLine": 208,
+          "column": 43,
+          "endColumn": 65,
+          "sourceFile": "src/view/Inspector/InspectionPart3.jsx"
+        }
+      }
+    },
+    {
+      "id": "src/view/Inspector/InspectionPart3.jsx:208:43-to-src/view/Inspector/InspectorLayout.jsx",
+      "source": "src/view/Inspector/InspectionPart3.jsx",
+      "target": "src/view/Inspector/InspectorLayout.jsx",
+      "data": {
+        "viaRoute": "/dashboard",
+        "trigger": {
+          "element": "navigate(\"/dashboard\")",
+          "line": 208,
+          "endLine": 208,
+          "column": 43,
+          "endColumn": 65,
+          "sourceFile": "src/view/Inspector/InspectionPart3.jsx"
+        }
+      }
+    },
+    {
+      "id": "src/view/Inspector/Menu.jsx:64:4-to-src/view/Auth/Login.jsx",
+      "source": "src/view/Inspector/InspectorLayout.jsx",
+      "target": "src/view/Auth/Login.jsx",
+      "data": {
+        "viaRoute": "/",
+        "trigger": {
+          "element": "navigate(\"/\")",
+          "line": 64,
+          "endLine": 64,
+          "column": 4,
+          "endColumn": 17,
+          "sourceFile": "src/view/Inspector/Menu.jsx"
+        }
+      }
+    }
+  ]
+}

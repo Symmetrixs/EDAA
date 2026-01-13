@@ -1,0 +1,24 @@
+{
+  "name": "workshop-2-automated-inspection-report",
+  "version": "1.0.0",
+  "description": "React project",
+  "type": "module",
+  "scripts": {
+    "dev": "cd \"Workshop-2-Automated-Inspection-Report\" && npm run dev",
+    "dev:inner": "cd \"Workshop-2-Automated-Inspection-Report\" && npm run dev",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-icons": "^5.5.0",
+    "react-router-dom": "^7.9.6"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.7.0",
+    "gh-pages": "^6.3.0",
+    "vite": "^7.2.4"
+  }
+}
