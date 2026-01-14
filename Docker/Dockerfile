@@ -14,14 +14,18 @@ RUN apt-get update && apt-get install -y \
     fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY requirements.txt .
+# Copy Backend requirements and install Python dependencies
+COPY Backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY . .
+# Copy Backend code and AI model
+COPY Backend/ ./Backend/
+COPY AI_model/ ./AI_model/
 
-# Expose port (matching Render's expected port)
+# Set working directory to Backend
+WORKDIR /app/Backend
+
+# Expose port
 EXPOSE 10000
 
 # Start the application
