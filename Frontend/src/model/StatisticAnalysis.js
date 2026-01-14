@@ -91,6 +91,12 @@ export default function useStatisticAnalysisViewModel() {
         data.forEach(item => {
             if (!item.ReportDate) return;
 
+            // Only count Completed and Approved inspections
+            const status = (item.Status || "").toLowerCase();
+            if (status !== "completed" && status !== "approved") {
+                return; // Skip pending and other statuses
+            }
+
             // Allow various date formats
             const date = new Date(item.ReportDate);
             if (!isNaN(date)) {
