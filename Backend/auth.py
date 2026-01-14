@@ -237,12 +237,7 @@ def update_profile(user_id: int, user: UserUpdate, token: str = Header(None, ali
             raise HTTPException(status_code=401, detail="Invalid Access Token. Please Log Out and Log In again.")
 
         # 1. Update Supabase Auth (Email / Password)
-        # We need a client authenticated as the USER.
-        # We can create a new client or use the existing one with the token?
-        # supabase-py's `auth.update_user` works on the current session.
-        # We can instantiate a temp client with the same URL/Key but set the session.
         
-        # Temp Client
         # Fix: Use ClientOptions object, not dict
         authed_client = create_client(url, key, options=ClientOptions(headers={'Authorization': token}))
         

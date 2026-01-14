@@ -104,6 +104,7 @@ async def call_hf_with_retry(client, url, data, max_retries=3):
     for attempt in range(max_retries):
         try:
             print(f"🔄 Calling HF Space (attempt {attempt+1}/{max_retries}): {url}")
+            print(f"📦 Payload: {data}")
             response = await client.post(url, json=data, timeout=120.0)
             response.raise_for_status()
             print(f"✅ HF Space responded successfully")
@@ -283,12 +284,13 @@ async def batch_detect_and_save(inspection_id: int, category: str):
                     try:
                         print(f"  📷 Detecting photo {idx+1}/{len(photo_ids)} (ID: {photo_id})...")
                         
-                        single_response = await call_hf_with_retry(
-                            client,
+                        # Direct call with query parameter (not JSON body)
+                        single_response = await client.post(
                             f"{HF_SPACE_URL}/detect-by-url",
-                            {"photo_url": photo_url},
-                            max_retries=2
+                            params={"photo_url": photo_url},  # Query parameter
+                            timeout=120.0
                         )
+                        single_response.raise_for_status()
                         
                         result = single_response.json()
                         result["photo_id"] = photo_id
@@ -419,16 +421,27 @@ async def redetect_single_photo(photo_id: int):
         
         print(f"🔄 Re-detecting photo {photo_id}")
         print(f"🌐 Using HuggingFace Space: {HF_SPACE_URL}")
+        print(f"📸 Photo URL: {photo['PhotoURL']}")
         
-        # Call HuggingFace Space
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            ai_response = await call_hf_with_retry(
-                client,
-                f"{HF_SPACE_URL}/detect-by-url",
-                {"photo_url": photo["PhotoURL"]},
-                max_retries=3
-            )
-            ai_result = ai_response.json()
+        # Call HuggingFace Space - photo_url must be a query parameter, not JSON body
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            try:
+                print(f"🔄 Calling HF Space: {HF_SPACE_URL}/detect-by-url?photo_url={photo['PhotoURL']}")
+                response = await client.post(
+                    f"{HF_SPACE_URL}/detect-by-url",
+                    params={"photo_url": photo["PhotoURL"]},  # Query parameter, not JSON body
+                    timeout=120.0
+                )
+                response.raise_for_status()
+                ai_result = response.json()
+                print(f"✅ HF Space responded successfully")
+            except httpx.HTTPStatusError as e:
+                print(f"❌ HF Space error: {e}")
+                print(f"Response body: {e.response.text if hasattr(e, 'response') else 'N/A'}")
+                raise HTTPException(status_code=500, detail=f"AI detection failed: {str(e)}")
+            except Exception as e:
+                print(f"❌ Unexpected error: {e}")
+                raise HTTPException(status_code=500, detail=f"AI detection failed: {str(e)}")
         
         print(f"✅ Detection complete: {ai_result.get('detection_count', 0)} defects found")
         

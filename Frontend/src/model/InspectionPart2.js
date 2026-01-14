@@ -186,7 +186,8 @@ export default function useInspectionPart2ViewModel(inspectionId) {
             setLoading(true);
 
             const response = await api.post(
-                `/photo/batch-detect/${inspectionId}?category=${category}`
+                `/photo/batch-detect/${inspectionId}?category=${category}`,
+                {}
             );
 
             console.log('AI Detection Response:', response.data); // 🐛 DEBUG
@@ -255,7 +256,7 @@ export default function useInspectionPart2ViewModel(inspectionId) {
         try {
             setLoading(true);
 
-            const response = await api.post(`/photo/redetect/${photoId}`);
+            const response = await api.post(`/photo/redetect/${photoId}`, {});
 
             if (response.data.success) {
                 // ✨ Convert base64 to data URL

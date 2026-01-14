@@ -171,7 +171,7 @@
       "data": {
         "viaRoute": "/forgot-password",
         "trigger": {
-          "element": "<Link to=\"/forgot-password\" className=\"text-sm text-blue-400 hover:text-blue-300 hover:underline\">\r\n              Forgot Password?\r\n            </Link>",
+          "element": "<Link to=\"/forgot-password\" className=\"text-sm text-blue-400 hover:text-blue-300 hover:underline\">\n              Forgot Password?\n            </Link>",
           "line": 140,
           "endLine": 142,
           "column": 12,
@@ -187,7 +187,7 @@
       "data": {
         "viaRoute": "/register",
         "trigger": {
-          "element": "<Link\r\n            to=\"/register\"\r\n            className=\"text-blue-400 font-medium hover:text-blue-300 hover:underline transition duration-150 ease-in-out\"\r\n          >\r\n            Register\r\n          </Link>",
+          "element": "<Link\n            to=\"/register\"\n            className=\"text-blue-400 font-medium hover:text-blue-300 hover:underline transition duration-150 ease-in-out\"\n          >\n            Register\n          </Link>",
           "line": 157,
           "endLine": 162,
           "column": 10,
@@ -203,7 +203,7 @@
       "data": {
         "viaRoute": "/",
         "trigger": {
-          "element": "<Link\r\n            to=\"/\"\r\n            className=\"text-blue-400 font-medium hover:text-blue-300 hover:underline transition duration-150 ease-in-out\"\r\n          >\r\n            Login\r\n          </Link>",
+          "element": "<Link\n            to=\"/\"\n            className=\"text-blue-400 font-medium hover:text-blue-300 hover:underline transition duration-150 ease-in-out\"\n          >\n            Login\n          </Link>",
           "line": 170,
           "endLine": 175,
           "column": 10,
