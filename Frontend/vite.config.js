@@ -1,21 +1,3 @@
-// // import { defineConfig } from 'vite'
-// // import react from '@vitejs/plugin-react'
-
-// // // https://vite.dev/config/
-// // export default defineConfig({
-// //   plugins: [react()],
-// // })
-
-// import { defineConfig } from 'vite';
-// import react from '@vitejs/plugin-react';
-
-// export default defineConfig({
-//   plugins: [react()],
-//   server: {
-//     port: 5173
-//   }
-// });
-
 import react from "@vitejs/plugin-react";
 import tailwind from "tailwindcss";
 import { defineConfig } from "vite";
@@ -29,7 +11,7 @@ export default defineConfig(async ({ mode }) => {
     // plugin may be a named export or default
     screenGraphPluginFunc = mod.screenGraphPlugin ?? mod.default ?? null;
   } catch (e) {
-    // plugin not installed or failed to load — silently ignore so dev server still starts
+    // plugin not installed or failed to load – silently ignore so dev server still starts
     screenGraphPluginFunc = null;
   }
 
@@ -45,7 +27,7 @@ export default defineConfig(async ({ mode }) => {
   return {
     plugins,
     publicDir: "public",
-    base: "./",
+    base: "/",  // Changed from "./" to "/" - this fixes the asset path issue!
     css: {
       postcss: {
         plugins: [tailwind()],
