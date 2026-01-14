@@ -20,7 +20,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy Backend code and AI model
 COPY Backend/ ./Backend/
-COPY AI_model/ ./AI_model/
 
 # Set working directory to Backend
 WORKDIR /app/Backend
