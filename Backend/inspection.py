@@ -179,6 +179,48 @@ def update_inspection(inspection_id: int, inspection: InspectionUpdate):
             except Exception as equip_err:
                 print(f"⚠️ Failed to update equipment dates: {equip_err}")
                 # Don't fail the whole request if equipment update fails
+            
+            # 🔔 Notify all admins that inspection is ready for review
+            try:
+                report_no = updated_inspection.get("ReportNo", "Unknown Report")
+                print(f"📢 Notifying admins about completed inspection {inspection_id} ({report_no})...")
+                
+                # Get all admin UserIDs
+                admins_res = supabase.table("Admin").select("UserID").execute()
+                
+                if admins_res.data:
+                    notified_count = 0
+                    for admin in admins_res.data:
+                        admin_user_id = admin["UserID"]
+                        
+                        # Get the admin's AuthUUID from User table
+                        user_res = supabase.table("User").select("AuthUUID").eq("UserID", admin_user_id).execute()
+                        
+                        if user_res.data and user_res.data[0].get("AuthUUID"):
+                            admin_uuid = user_res.data[0]["AuthUUID"]
+                            
+                            # Create notification
+                            notif_data = {
+                                "UserID": admin_uuid,
+                                "Message": f"Inspection report {report_no} has been completed and is ready for review.",
+                                "Type": "info",
+                                "IsRead": False
+                            }
+                            
+                            supabase.table("Notification").insert(notif_data).execute()
+                            notified_count += 1
+                            print(f"  ✅ Notified admin {admin_user_id} (UUID: {admin_uuid})")
+                        else:
+                            print(f"  ⚠️ Admin {admin_user_id} has no AuthUUID, skipping notification")
+                    
+                    print(f"✅ Successfully notified {notified_count} admin(s)")
+                else:
+                    print("⚠️ No admins found to notify")
+                    
+            except Exception as notif_err:
+                print(f"⚠️ Failed to send admin notifications: {notif_err}")
+                traceback.print_exc()
+                # Don't fail the whole request if notification fails
         
         return updated_inspection
     except Exception as e:
