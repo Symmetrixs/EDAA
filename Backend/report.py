@@ -70,6 +70,44 @@ class GenerateReportRequest(BaseModel):
     ReportDate: Optional[str] = None
 
 # ---------------------------------------------------------
+# Helper Function: Check if LibreOffice is available
+# ---------------------------------------------------------
+
+def find_libreoffice():
+    """Find LibreOffice executable path"""
+    # Linux/Docker paths
+    linux_paths = [
+        "soffice",
+        "/usr/bin/soffice",
+        "/usr/bin/libreoffice",
+        "libreoffice"
+    ]
+    
+    # Windows paths (for local dev)
+    windows_paths = [
+        r"C:\Program Files\LibreOffice\program\soffice.exe",
+        r"C:\Program Files (x86)\LibreOffice\program\soffice.exe"
+    ]
+    
+    all_paths = linux_paths + windows_paths
+    
+    for path in all_paths:
+        try:
+            # Use 'which' on Linux or check file existence
+            if os.path.isabs(path):
+                if os.path.exists(path):
+                    return path
+            else:
+                # For non-absolute paths, use shutil.which to find in PATH
+                result = shutil.which(path)
+                if result:
+                    return result
+        except Exception:
+            continue
+    
+    return None
+
+# ---------------------------------------------------------
 # Routes
 # ---------------------------------------------------------
 
@@ -206,11 +244,12 @@ def get_reports_by_inspector(user_id: int):
         insp_response = supabase.table("Inspection").select("InspectionID").eq("UserID_Inspector", user_id).execute()
         
         if not insp_response.data:
-            return [] # No inspections created by this user
-            
-        inspection_ids = [item['InspectionID'] for item in insp_response.data]
-        
-        # Step 2: Get Reports for these Inspection IDs
+            # No inspections created by this user
+            return []
+
+        inspection_ids = [item["InspectionID"] for item in insp_response.data]
+
+        # Step 2: Get Reports matching those Inspection IDs
         if not inspection_ids:
             return []
 
@@ -237,47 +276,70 @@ async def approve_report_upload(inspection_id: int, file: UploadFile = File(...)
         )
         url_docx = supabase.storage.from_(bucket_name).get_public_url(filename_docx)
 
-        # 2. Convert to PDF using LibreOffice (or docx2pdf if available)
+        # 2. Convert to PDF using LibreOffice
         temp_dir = tempfile.mkdtemp()
         docx_path = os.path.join(temp_dir, "input.docx")
-        pdf_path = os.path.join(temp_dir, "input.pdf") # LibreOffice default
-        final_pdf_path = os.path.join(temp_dir, "output.pdf")
+        pdf_path = os.path.join(temp_dir, "input.pdf")
 
         # Save DOCX to temp
         with open(docx_path, "wb") as f:
             f.write(file_content)
 
-        # Convert
+        # Find LibreOffice
+        soffice_path = find_libreoffice()
         conversion_success = False
         
-        if convert is not None:
-             # Plan A: Windows
+        if soffice_path:
             try:
-                try:
-                    pythoncom.CoInitialize()
-                except:
-                    pass
-                convert(docx_path, final_pdf_path)
-                if os.path.exists(final_pdf_path):
+                cmd = [
+                    soffice_path,
+                    "--headless",
+                    "--convert-to", "pdf",
+                    "--outdir", temp_dir,
+                    docx_path
+                ]
+                print(f"✅ Found LibreOffice at: {soffice_path}")
+                print(f"🔄 Running conversion: {' '.join(cmd)}")
+                
+                result = subprocess.run(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=30,
+                    check=False
+                )
+                
+                print(f"📤 Return code: {result.returncode}")
+                print(f"📤 Stdout: {result.stdout.decode()}")
+                print(f"📤 Stderr: {result.stderr.decode()}")
+                
+                if result.returncode == 0 and os.path.exists(pdf_path):
                     conversion_success = True
+                    print(f"✅ PDF created successfully at {pdf_path}")
+            except subprocess.TimeoutExpired:
+                print("⏱️ LibreOffice conversion timed out")
             except Exception as e:
-                print(f"docx2pdf failed: {e}")
+                print(f"❌ LibreOffice conversion error: {e}")
         
-        if not conversion_success:
-            # Plan B: Linux/LibreOffice
-            cmd = ["soffice", "--headless", "--convert-to", "pdf", "--outdir", temp_dir, docx_path]
-            print(f"Running LibreOffice conversion: {' '.join(cmd)}")
-            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            if result.returncode == 0 and os.path.exists(pdf_path):
-                final_pdf_path = pdf_path
-                conversion_success = True
+        # Fallback to docx2pdf (Windows only)
+        if not conversion_success and convert is not None:
+            print("🔄 Trying docx2pdf fallback...")
+            try:
+                if pythoncom:
+                    pythoncom.CoInitialize()
+                convert(docx_path, pdf_path)
+                if os.path.exists(pdf_path):
+                    conversion_success = True
+                    print("✅ PDF created with docx2pdf")
+            except Exception as e:
+                print(f"❌ docx2pdf failed: {e}")
 
-        if not conversion_success or not os.path.exists(final_pdf_path):
-             raise Exception("PDF file was not created by the converter")
+        if not conversion_success or not os.path.exists(pdf_path):
+            raise Exception(f"PDF conversion failed. LibreOffice path: {soffice_path}")
 
         # 3. Upload Generated PDF
         filename_pdf = f"Approved-PDF-{inspection_id}-{int(time.time())}.pdf"
-        with open(final_pdf_path, "rb") as f:
+        with open(pdf_path, "rb") as f:
             pdf_content = f.read()
         
         supabase.storage.from_(bucket_name).upload(
@@ -288,13 +350,11 @@ async def approve_report_upload(inspection_id: int, file: UploadFile = File(...)
         url_pdf = supabase.storage.from_(bucket_name).get_public_url(filename_pdf)
 
         # 4. Update Database
-        # Update Report Table
         supabase.table("Report").update({
             "ApprovedWordFile": url_docx,
             "ApprovedPdfFile": url_pdf
         }).eq("InspectionID", inspection_id).execute()
 
-        # Update Inspection Table Status to 'Approved'
         supabase.table("Inspection").update({"Status": "Approved"}).eq("InspectionID", inspection_id).execute()
 
         # Notification
@@ -304,21 +364,18 @@ async def approve_report_upload(inspection_id: int, file: UploadFile = File(...)
                 uid_int = insp.data[0]['UserID_Inspector']
                 rno = insp.data[0]['ReportNo']
                 
-                # Fetch AuthUUID from User table
                 u_res = supabase.table("User").select("AuthUUID").eq("UserID", uid_int).execute()
                 if u_res.data and u_res.data[0].get('AuthUUID'):
                     uuid_str = u_res.data[0]['AuthUUID']
-                    print(f"DEBUG_NOTIF: AuthUUID {uuid_str} found. Sending Approved Notification...")
+                    print(f"DEBUG_NOTIF: Sending approval notification to {uuid_str}")
                     
                     supabase.table("Notification").insert({
                         "UserID": uuid_str,
                         "Message": f"Your report {rno} has been Approved.",
                         "Type": "success"
                     }).execute()
-                else:
-                    print(f"ERROR: AuthUUID not found for UserID {uid_int}")
         except Exception as e:
-            print(f"Notification Error (Ignored): {e}")
+            print(f"Notification Error: {e}")
 
         # Cleanup
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -335,14 +392,12 @@ async def approve_report_upload(inspection_id: int, file: UploadFile = File(...)
 @router.put("/{inspection_id}/revert-approval")
 def revert_approval(inspection_id: int):
     try:
-        # Revert Report Table
         supabase.table("Report").update({
             "ApprovedWordFile": None,
             "ApprovedPdfFile": None,
-            "Comment": "Status: Completed" # Or whatever appropriate
+            "Comment": "Status: Completed"
         }).eq("InspectionID", inspection_id).execute()
 
-        # Revert Inspection Table Status
         supabase.table("Inspection").update({"Status": "Completed"}).eq("InspectionID", inspection_id).execute()
 
         return {"message": "Report reverted to Completed status"}
@@ -351,72 +406,82 @@ def revert_approval(inspection_id: int):
 
 # 10. Convert DOCX to PDF (Helper Endpoint)
 @router.post("/convert")
-async def convert_docx_to_pdf(file: UploadFile = File(...)):
-    # 1. Prepare Paths
+async def convert_docx_to_pdf_endpoint(file: UploadFile = File(...)):
     temp_dir = tempfile.mkdtemp()
     docx_path = os.path.join(temp_dir, "input.docx")
-    pdf_path = os.path.join(temp_dir, "input.pdf") # LibreOffice preserves name, so it will be input.pdf
-    final_pdf_path = os.path.join(temp_dir, "output.pdf") # We will rename it or serve it directly
+    pdf_path = os.path.join(temp_dir, "input.pdf")
 
     try:
-        # 2. Save Uploaded DOCX
+        # Save uploaded DOCX
         with open(docx_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
 
-        # 3. Conversion Logic
-        # Priority 1: LibreOffice (Preferred for Deployment)
+        # Find LibreOffice
+        soffice_path = find_libreoffice()
         conversion_success = False
         
-        # Try LibreOffice first (both command and common Windows path)
-        soffice_paths = ["soffice", r"C:\Program Files\LibreOffice\program\soffice.exe"]
-        
-        for soffice_cmd in soffice_paths:
+        if soffice_path:
             try:
                 cmd = [
-                    soffice_cmd, 
-                    "--headless", 
-                    "--convert-to", 
-                    "pdf", 
-                    "--outdir", 
-                    temp_dir, 
+                    soffice_path,
+                    "--headless",
+                    "--convert-to", "pdf",
+                    "--outdir", temp_dir,
                     docx_path
                 ]
-                print(f"Running LibreOffice conversion with: {soffice_cmd}")
-                result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                print(f"✅ Found LibreOffice at: {soffice_path}")
+                print(f"🔄 Running conversion: {' '.join(cmd)}")
+                
+                result = subprocess.run(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=30,
+                    check=False
+                )
+                
+                print(f"📤 Return code: {result.returncode}")
+                print(f"📤 Stdout: {result.stdout.decode()}")
+                print(f"📤 Stderr: {result.stderr.decode()}")
                 
                 if result.returncode == 0 and os.path.exists(pdf_path):
                     conversion_success = True
-                    final_pdf_path = pdf_path
-                    break # Success!
-                else:
-                    print(f"LibreOffice ({soffice_cmd}) failed. Stderr: {result.stderr.decode()}")
-
-            except FileNotFoundError:
-                 print(f"LibreOffice command '{soffice_cmd}' not found. Trying next...")
-
-        # Priority 2: Windows docx2pdf (Fallback for local dev without LibreOffice)
+                    print(f"✅ PDF created successfully at {pdf_path}")
+            except subprocess.TimeoutExpired:
+                print("⏱️ LibreOffice conversion timed out")
+            except Exception as e:
+                print(f"❌ LibreOffice conversion error: {e}")
+        else:
+            print("❌ LibreOffice not found in system")
+        
+        # Fallback to docx2pdf (Windows only)
         if not conversion_success and convert is not None:
-             print("Falling back to docx2pdf (MS Word)...")
-             try:
-                try:
+            print("🔄 Trying docx2pdf fallback...")
+            try:
+                if pythoncom:
                     pythoncom.CoInitialize()
-                except:
-                    pass
-                convert(docx_path, final_pdf_path)
-                if os.path.exists(final_pdf_path):
-                     conversion_success = True
-             except Exception as e:
-                 print(f"docx2pdf fallback failed: {e}")
+                convert(docx_path, pdf_path)
+                if os.path.exists(pdf_path):
+                    conversion_success = True
+                    print("✅ PDF created with docx2pdf")
+            except Exception as e:
+                print(f"❌ docx2pdf failed: {e}")
 
         if not conversion_success:
-             raise Exception("PDF Conversion Failed. Server needs LibreOffice ('soffice') installed for deployment, or MS Word for local testing.")
+            raise Exception(f"PDF conversion failed. LibreOffice found: {soffice_path is not None}")
 
-        # 4. Check Result
-        if not os.path.exists(final_pdf_path):
-             raise Exception("PDF file was not created by the converter")
+        if not os.path.exists(pdf_path):
+            raise Exception("PDF file was not created")
 
-        return FileResponse(final_pdf_path, filename="report.pdf", media_type="application/pdf")
+        return FileResponse(
+            pdf_path,
+            filename="report.pdf",
+            media_type="application/pdf"
+        )
 
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Conversion failed: {str(e)}")
+    finally:
+        # Cleanup after response is sent
+        pass  # FileResponse will handle the file, cleanup later
