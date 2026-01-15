@@ -9,6 +9,19 @@ const cleanText = (val) => {
     return String(val).replace(/[^\x09\x0A\x0D\x20-\uD7FF\uE000-\uFFFD\u10000-\u10FFFF]/g, "");
 };
 
+// Prefer AnnotatedPhotoURL when available
+const pickPhotoUrl = (p) => {
+    if (!p) return "";
+    try {
+        const ann = p.AnnotatedPhotoURL;
+        if (ann && ann !== '-' && String(ann).trim() !== '') return String(ann);
+    } catch (e) { }
+    try {
+        const photo = p.PhotoURL;
+        if (photo && photo !== '-' && String(photo).trim() !== '') return String(photo);
+    } catch (e) { }
+    return "";
+};
 // Helper: Create a 1x1 Transparent PNG Buffer
 const getTransparentImage = () => {
     const fallbackBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
@@ -254,7 +267,7 @@ export const generateDoc = async (inspectionData, equipment, inspector, photos) 
 
         await Promise.all(allPhotos.map(async (p) => {
             if (!p) return;
-            const url = cleanText(p.PhotoURL);
+            const url = cleanText(pickPhotoUrl(p));
             if (url && !imageMap.has(url)) {
                 try {
                     const res = await fetch(url, { mode: 'cors' });
@@ -354,7 +367,7 @@ export const generateDoc = async (inspectionData, equipment, inspector, photos) 
                             }
 
                             photos = groupArr.map(p => {
-                                const url = cleanText(p.PhotoURL);
+                                const url = cleanText(pickPhotoUrl(p));
                                 const imageBuffer = imageMap.get(url);
                                 const finalBuffer = imageBuffer || getTransparentImage();
 
