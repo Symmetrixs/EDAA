@@ -65,6 +65,25 @@ class CanvasSaveRequest(BaseModel):
 # Helper Functions
 # ---------------------------------------------------------
 
+def deduplicate_detection_text(text: str) -> str:
+    """
+    Remove duplicate detection messages from text.
+    If the same sentence is repeated multiple times, keep only one instance.
+    For example: "Surface corrosion and rust detected on metal surface. Surface corrosion..."
+    becomes: "Surface corrosion and rust detected on metal surface."
+    """
+    if not text:
+        return text
+    
+    # Split by period and filter out empty strings
+    sentences = [s.strip() for s in text.split('.') if s.strip()]
+    
+    # Remove duplicates while preserving order (using dict to maintain insertion order in Python 3.7+)
+    unique_sentences = list(dict.fromkeys(sentences))
+    
+    # Join back with periods and add final period
+    return '. '.join(unique_sentences) + '.' if unique_sentences else text
+
 async def upload_annotated_image_to_storage(annotated_image_base64, inspection_id, photo_id):
     """Upload annotated image to Supabase Storage"""
     if not annotated_image_base64:
@@ -325,8 +344,9 @@ async def batch_detect_and_save(inspection_id: int, category: str):
             
             try:
                 # Create Finding record
+                finding_text = deduplicate_detection_text(result.get("finding", "No finding description"))
                 finding_response = supabase.table("Finding").insert({
-                    "Description": result.get("finding", "No finding description")
+                    "Description": finding_text
                 }).execute()
                 
                 if not finding_response.data:
@@ -336,8 +356,9 @@ async def batch_detect_and_save(inspection_id: int, category: str):
                 finding_id = finding_response.data[0]["FindingID"]
                 
                 # Create Recommendation record
+                recommendation_text = deduplicate_detection_text(result.get("recommendation", "No recommendation"))
                 recommendation_response = supabase.table("Recommendation").insert({
-                    "Description": result.get("recommendation", "No recommendation")
+                    "Description": recommendation_text
                 }).execute()
                 
                 if not recommendation_response.data:
@@ -446,31 +467,33 @@ async def redetect_single_photo(photo_id: int):
         print(f"✅ Detection complete: {ai_result.get('detection_count', 0)} defects found")
         
         # Update or create Finding
+        finding_text = deduplicate_detection_text(ai_result["finding"])
         if photo.get("FindingID"):
             supabase.table("Finding")\
-                .update({"Description": ai_result["finding"]})\
+                .update({"Description": finding_text})\
                 .eq("FindingID", photo["FindingID"])\
                 .execute()
             finding_id = photo["FindingID"]
             print(f"  ✅ Updated existing Finding {finding_id}")
         else:
             finding_response = supabase.table("Finding").insert({
-                "Description": ai_result["finding"]
+                "Description": finding_text
             }).execute()
             finding_id = finding_response.data[0]["FindingID"]
             print(f"  ✅ Created new Finding {finding_id}")
         
         # Update or create Recommendation
+        recommendation_text = deduplicate_detection_text(ai_result["recommendation"])
         if photo.get("RecommendID"):
             supabase.table("Recommendation")\
-                .update({"Description": ai_result["recommendation"]})\
+                .update({"Description": recommendation_text})\
                 .eq("RecommendID", photo["RecommendID"])\
                 .execute()
             recommendation_id = photo["RecommendID"]
             print(f"  ✅ Updated existing Recommendation {recommendation_id}")
         else:
             recommendation_response = supabase.table("Recommendation").insert({
-                "Description": ai_result["recommendation"]
+                "Description": recommendation_text
             }).execute()
             recommendation_id = recommendation_response.data[0]["RecommendID"]
             print(f"  ✅ Created new Recommendation {recommendation_id}")
